@@ -1,0 +1,7 @@
+{
+	"linters": {
+		"javac": {
+		    "lint": "all,-deprecation"
+		}
+	}
+}
