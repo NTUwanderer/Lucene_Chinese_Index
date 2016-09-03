@@ -20,6 +20,14 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+
+import java.io.Reader;
+import java.io.StringReader;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.PrintWriter;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -44,9 +52,8 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
-// import com.ibm.icu.util.ULocale;
-// import com.ibm.icu.text.Collator;
-// import org.apache.lucene.collation.ICUCollationKeyAnalyzer;
+import org.jsoup.Jsoup;
+
 // import net.paoding.analysis.analyzer.PaodingAnalyzer;
 
 /** Index all text files under a directory.
@@ -99,7 +106,7 @@ public class IndexFiles {
             Analyzer analyzer = new SmartChineseAnalyzer();
             // Analyzer analyzer = new PaodingAnalyzer();
 
-            // Collator collator = Collator.getInstance(new ULocale("ar"));
+            // Collator collator = Collator.getInstance(new ULocale("UTF_8"));
             // Analyzer analyzer = new ICUCollationKeyAnalyzer(collator);
             IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
 
@@ -184,26 +191,37 @@ public class IndexFiles {
             // field that is indexed (i.e. searchable), but don't tokenize 
             // the field into separate words and don't index term frequency
             // or positional information:
-            Field pathField = new StringField("path", file.toString(), Field.Store.YES);
+            String path = file.toString();
+            if (path.toLowerCase().endsWith(".pdf")) {
+                doc = LucenePDFDocument.getDocument(file.toFile());
+            } else if (path.toLowerCase().endsWith(".html")) {
+                String text = readHtmlFile(path);
+                if (text != "") {
+                    StringReader reader = new StringReader(text);
+                    doc.add(new LongPoint("modified", lastModified));
+                    doc.add(new TextField("contents", reader));
+                }
+            } else {
+                // Add the last modified date of the file a field named "modified".
+                // Use a LongPoint that is indexed (i.e. efficiently filterable with
+                // PointRangeQuery).  This indexes to milli-second resolution, which
+                // is often too fine.  You could instead create a number based on
+                // year/month/day/hour/minutes/seconds, down the resolution you require.
+                // For example the long value 2011021714 would mean
+                // February 17, 2011, 2-3 PM.
+                doc.add(new LongPoint("modified", lastModified));
+                
+                // Add the contents of the file to a field named "contents".  Specify a Reader,
+                // so that the text of the file is tokenizeized and indexed, but not stored.
+                // Note that FileReader expects the file to be in UTF-8 encoding.
+                // If that's not the case searching for special characters will fail.
+                InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8);
+                System.out.println("reader: " + reader.toString());
+                doc.add(new TextField("contents", new BufferedReader(reader)));
+            }
+            Field pathField = new StringField("path", path, Field.Store.YES);
             doc.add(pathField);
-            
-            // Add the last modified date of the file a field named "modified".
-            // Use a LongPoint that is indexed (i.e. efficiently filterable with
-            // PointRangeQuery).  This indexes to milli-second resolution, which
-            // is often too fine.  You could instead create a number based on
-            // year/month/day/hour/minutes/seconds, down the resolution you require.
-            // For example the long value 2011021714 would mean
-            // February 17, 2011, 2-3 PM.
-            doc.add(new LongPoint("modified", lastModified));
-            
-            // Add the contents of the file to a field named "contents".  Specify a Reader,
-            // so that the text of the file is tokenizeized and indexed, but not stored.
-            // Note that FileReader expects the file to be in UTF-8 encoding.
-            // If that's not the case searching for special characters will fail.
-            InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8);
-            System.out.println("reader: " + reader.toString());
-            doc.add(new TextField("contents", new BufferedReader(reader)));
-            
+
             if (writer.getConfig().getOpenMode() == OpenMode.CREATE) {
                 // New index, so we just add the document (no old document can be there):
                 System.out.println("adding " + file);
@@ -216,5 +234,18 @@ public class IndexFiles {
                 writer.updateDocument(new Term("path", file.toString()), doc);
             }
         }
+    }
+    public static String readHtmlFile(String fileName) {
+        String fileString = "";
+        try {
+            String line;
+            BufferedReader br = new BufferedReader(new FileReader(fileName));
+            while ((line = br.readLine()) != null) {
+                fileString += line;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return Jsoup.parse(fileString,"UTF-8").text();
     }
 }
