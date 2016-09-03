@@ -21,7 +21,9 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+
 import java.util.Date;
+import java.util.List;
 
 import java.io.PrintWriter;
 
@@ -37,6 +39,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
+
+import org.apache.lucene.index.IndexableField;
 
 /** Simple command-line based search demo. */
 public class SearchFiles {
@@ -60,7 +64,7 @@ public class SearchFiles {
         String queryString = null;
         int hitsPerPage = 10;
         
-        for(int i = 0;i < args.length;i++) {
+        for(int i = 0; i < args.length; i++) {
             if ("-index".equals(args[i])) {
                 index = args[i+1];
                 i++;
@@ -183,9 +187,15 @@ public class SearchFiles {
                 String path = doc.get("path");
                 if (path != null) {
                     System.out.println((i+1) + ". " + path);
+                    List<IndexableField> list = doc.getFields();
+                    for (int j = 0, size = list.size(); j < size; ++j) {
+                        IndexableField field = list.get(j);
+                        System.out.println("   " + field.name() + ": " + field.stringValue());
+                    }
+
                     String title = doc.get("title");
                     if (title != null) {
-                        System.out.println("   Title: " + doc.get("title"));
+                        System.out.println("   Title: " + title);
                     }
                 } else {
                     System.out.println((i+1) + ". " + "No path for this document");

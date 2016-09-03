@@ -28,6 +28,8 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.PrintWriter;
 
+import java.io.FileInputStream;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -53,6 +55,9 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
 import org.jsoup.Jsoup;
+
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 
 // import net.paoding.analysis.analyzer.PaodingAnalyzer;
 
@@ -201,6 +206,13 @@ public class IndexFiles {
                     doc.add(new LongPoint("modified", lastModified));
                     doc.add(new TextField("contents", reader));
                 }
+            } else if (path.toLowerCase().endsWith(".docx")) {
+                String text = readDocxFile(path);
+                if (text != "") {
+                    StringReader reader = new StringReader(text);
+                    doc.add(new LongPoint("modified", lastModified));
+                    doc.add(new TextField("contents", reader));
+                }
             } else {
                 // Add the last modified date of the file a field named "modified".
                 // Use a LongPoint that is indexed (i.e. efficiently filterable with
@@ -247,5 +259,16 @@ public class IndexFiles {
             e.printStackTrace();
         }
         return Jsoup.parse(fileString,"UTF-8").text();
+    }
+    public static String readDocxFile(String fileName) {
+        String fileString = "";
+        try {
+            XWPFDocument docx = new XWPFDocument(new FileInputStream("D:\\Resume\\Resume_test.docx"));
+            XWPFWordExtractor we = new XWPFWordExtractor(docx);
+            fileString = we.getText();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return fileString;
     }
 }
